@@ -1,0 +1,65 @@
+{
+  "mjolnir": {
+    "default_speeds_config": "/custom_files/default_speeds.json"
+  },
+  "loki": {
+    "actions": [
+      "locate",
+      "sources_to_targets",
+      "isochrone",
+      "trace_route",
+      "trace_attributes",
+      "transit_available",
+      "expansion",
+      "status",
+      "route"
+    ]
+  },
+  "thor": {
+    "actions": [
+      "sources_to_targets",
+      "isochrone",
+      "route",
+      "trace_route",
+      "trace_attributes",
+      "expansion",
+      "status"
+    ]
+  },
+  "odin": {
+    "actions": [
+      "route",
+      "trace_attributes",
+      "trace_route"
+    ]
+  },
+  "skadi": {
+    "actions": [
+      "height",
+      "raster",
+      "skadi"
+    ]
+  },
+  "meili": {
+    "grid": {
+      "cache_size": 100240,
+      "size": 500
+    },
+    "customizable": true,
+    "mode": "auto",
+    "default": {
+      "beta": 3,
+      "breakage_distance": 2000,
+      "geometry": true,
+      "gps_accuracy": 5.0,
+      "interpolation_distance": 10,
+      "max_route_distance_factor": 4,
+      "max_route_time_factor": 4,
+      "max_search_radius": 100,
+      "radius": 35,
+      "search_radius": 50,
+      "sigma_z": 4.07,
+      "turn_penalty_factor": 200
+    }
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+*.test.ts
+.git
+Dockerfile
+.dockerignore
+npm-debug.log*

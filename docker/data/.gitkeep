@@ -1,0 +1,4 @@
+# Region data is gitignored. Place extracted PBFs and the Valhalla build here:
+#   docker/data/jabalpur.osm.pbf
+#   docker/data/valhalla/jabalpur.osm.pbf
+#   docker/data/valhalla/valhalla.json

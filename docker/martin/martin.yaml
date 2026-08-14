@@ -1,0 +1,19 @@
+# Martin tile server configuration.
+# Publish only the curated `sara` schema (POI/tile views) to keep the catalog clean.
+postgres:
+  connection_string: ${DATABASE_URL:-postgresql://sara:sara@postgis:5432/sara}
+  default_srid: 4326
+  auto_bounds: quick
+  auto_publish:
+    tables:
+      from_schemas:
+        - sara
+      id_columns:
+        - osm_id
+      clip_geom: true
+      buffer: 64
+      extent: 4096
+    functions:
+      from_schemas: []
+cache:
+  size_mb: 512

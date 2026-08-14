@@ -1,0 +1,38 @@
+# --- Node ---
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# --- Environment ---
+.env
+.env.local
+
+# --- Large data artifacts (never commit raw OSM data / tiles) ---
+docker/data/*.pbf
+docker/data/*.osm
+docker/data/*.osmium
+docker/data/*.cache
+docker/data/*.tokens
+docker/data/india/
+docker/data/india-latest.osm.pbf
+docker/data/valhalla/*
+!docker/data/valhalla/.gitkeep
+!docker/data/.gitkeep
+*.tar.gz
+valhalla_tiles/
+
+# --- Data volumes ---
+volumes/
+*.sqlite3
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+npm-debug.log*

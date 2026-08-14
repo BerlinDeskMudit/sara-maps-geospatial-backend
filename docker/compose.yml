@@ -1,0 +1,160 @@
+name: sara-maps
+
+networks:
+  sara-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+
+x-db-env: &db-env
+  POSTGRES_DB: ${POSTGRES_DB:-sara}
+  POSTGRES_USER: ${POSTGRES_USER:-sara}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sara}
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    container_name: sara-postgis
+    environment: *db-env
+    command:
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "maintenance_work_mem=256MB"
+    ports:
+      - "${POSTGIS_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgis/init:/docker-entrypoint-initdb.d:ro
+      - ./postgis/sara-schema.sql:/sara/sara-schema.sql:ro
+    networks: [sara-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sara} -d ${POSTGRES_DB:-sara}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  osm2pgsql:
+    image: iboates/osm2pgsql:latest
+    container_name: sara-osm2pgsql
+    profiles: ["import"]
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      PGHOST: postgis
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-sara}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-sara}
+      PGDATABASE: ${POSTGRES_DB:-sara}
+    volumes:
+      - ./data:/data:ro
+      - ./postgis/sara-schema.sql:/sara-schema.sql:ro
+    command:
+      - "-c"
+      - "-l"
+      - "--hstore"
+      - "--number-processes"
+      - "4"
+      - "/data/${REGION_NAME:-jabalpur}.osm.pbf"
+    networks: [sara-net]
+    restart: "no"
+
+  valhalla:
+    image: ghcr.io/valhalla/valhalla-scripted:latest
+    container_name: sara-valhalla
+    environment:
+      server_threads: ${VALHALLA_THREADS:-6}
+      build_admins: "True"
+      build_time_zones: "True"
+      use_tiles_ignore_pbf: "False"
+      force_rebuild: "False"
+      serve_tiles: "True"
+      update_existing_config: "True"
+    ports:
+      - "${VALHALLA_PORT:-8002}:8002"
+    volumes:
+      - ./data/valhalla:/custom_files
+    networks: [sara-net]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/status > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: sara-martin
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sara}:${POSTGRES_PASSWORD:-sara}@postgis:5432/${POSTGRES_DB:-sara}
+    command: ["--config", "/config/martin.yaml"]
+    ports:
+      - "${MARTIN_PORT:-3000}:3000"
+    volumes:
+      - ./martin/martin.yaml:/config/martin.yaml:ro
+    networks: [sara-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sara-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    networks: [sara-net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../backend/api
+    container_name: sara-api
+    depends_on:
+      postgis:
+        condition: service_healthy
+      martin:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      valhalla:
+        condition: service_started
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PORT: "8080"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sara}:${POSTGRES_PASSWORD:-sara}@postgis:5432/${POSTGRES_DB:-sara}
+      VALHALLA_URL: http://valhalla:8002
+      MARTIN_URL: http://martin:3000
+      REDIS_URL: redis://redis:6379
+      API_RATE_LIMIT_MAX: ${API_RATE_LIMIT_MAX:-120}
+      GEOCODE_CACHE_TTL_S: ${GEOCODE_CACHE_TTL_S:-86400}
+      ROUTE_CACHE_TTL_S: ${ROUTE_CACHE_TTL_S:-120}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    networks: [sara-net]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
