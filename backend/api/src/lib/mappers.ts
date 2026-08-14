@@ -106,19 +106,21 @@ export interface TraceResult {
 }
 
 export function mapTrace(data: unknown): TraceResult {
-  const matched = (data as { matched?: any }).matched;
-  if (!matched) {
-    throw new AppError('TRACE_ERROR', 'map-matching returned no match', 502);
-  }
-  const points = decodePolyline(matched.shape ?? '', 6);
+  const root = data as { matched?: any; shape?: string; confidence_score?: number; edges?: any[]; matched_points?: any[] };
+  const matched = root.matched ?? root;
+  const shape = matched.shape ?? '';
+  const points = shape ? decodePolyline(shape, 6) : [];
   return {
     geometry: encodePolyline(points, 5),
     confidence: matched.confidence_score ?? null,
-    matched_points: points,
+    matched_points: (matched.matched_points ?? []).map((p: any) => ({
+      lat: p?.lat ?? 0,
+      lon: p?.lon ?? 0,
+    })),
     edges: (matched.edges ?? []).map((e: any) => ({
       id: e?.id ?? 0,
       speed: e?.speed ?? 0,
-      length_m: e?.length ?? 0,
+      length_m: typeof e?.length === 'number' ? Math.round(e.length * 1000) : 0,
     })),
   };
 }

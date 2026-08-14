@@ -94,17 +94,32 @@ describe('mapIsochrone', () => {
 });
 
 describe('mapTrace', () => {
-  it('maps matched points and edges', () => {
+  it('maps trace_attributes response (top-level fields)', () => {
     const data = {
-      matched: {
-        shape: shape6,
-        confidence_score: 0.87,
-        edges: [{ id: 123, speed: 38, length: 120.5 }],
-      },
+      units: 'kilometers',
+      shape: shape6,
+      confidence_score: 0.87,
+      matched_points: tracePoints,
+      edges: [{ id: 123, speed: 38, length: 0.1205 }],
     };
     const result = mapTrace(data);
     expect(result.confidence).toBe(0.87);
-    expect(result.edges).toEqual([{ id: 123, speed: 38, length_m: 120.5 }]);
+    expect(result.edges).toEqual([{ id: 123, speed: 38, length_m: 121 }]);
+    expect(result.matched_points).toEqual(tracePoints);
+    expect(result.geometry).toBe(encodePolyline(tracePoints, 5));
+  });
+
+  it('falls back to nested matched object', () => {
+    const data = {
+      matched: {
+        shape: shape6,
+        confidence_score: 0.5,
+        matched_points: tracePoints,
+        edges: [],
+      },
+    };
+    const result = mapTrace(data);
+    expect(result.confidence).toBe(0.5);
     expect(result.matched_points).toEqual(tracePoints);
   });
 });

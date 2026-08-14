@@ -41,8 +41,8 @@ export const trace: FastifyPluginAsync = async (fastify) => {
     const radius = body.radius ?? 100;
     const shape = encodePolyline(body.trace, 6);
 
-    const data = await valhalla.post('/trace_route', {
-      shape,
+    const data = await valhalla.post('/trace_attributes', {
+      encoded_polyline: shape,
       shape_match: 'map_snap',
       costing: mode,
       costing_options: { [mode]: {} },
