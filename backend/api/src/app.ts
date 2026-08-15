@@ -19,10 +19,19 @@ import { trace } from './routes/trace.js';
 import { poi } from './routes/poi.js';
 import { tiles } from './routes/tiles.js';
 
+export interface RedisLike {
+  isOpen: boolean;
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, opts: { EX: number }): Promise<unknown>;
+  ping(): Promise<string>;
+  quit(): Promise<string>;
+}
+
 export interface BuildAppOptions {
   config?: Config;
   pg?: PgClient;
   valhalla?: ValhallaClient;
+  redis?: RedisLike;
 }
 
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -35,9 +44,12 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(sensible);
   await app.register(cors, { origin: true });
 
-  const redis = createClient({ url: config.redisUrl });
-  redis.on('error', (err) => app.log.warn({ err }, 'redis error'));
-  void redis.connect().catch((err) => app.log.warn({ err }, 'redis connect failed'));
+  const redis: RedisLike = opts.redis ?? (() => {
+    const client = createClient({ url: config.redisUrl });
+    client.on('error', (err) => app.log.warn({ err }, 'redis error'));
+    void client.connect().catch((err) => app.log.warn({ err }, 'redis connect failed'));
+    return client;
+  })();
 
   app.decorate('sara', { config, pg, valhalla, redis });
   app.addHook('onClose', async () => {
@@ -61,15 +73,6 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     timeWindow: '1 minute',
   });
 
-  await app.register(health);
-  await app.register(geocode);
-  await app.register(route);
-  await app.register(matrix);
-  await app.register(isochrone);
-  await app.register(trace);
-  await app.register(poi);
-  await app.register(tiles);
-
   app.setNotFoundHandler((request, reply) => {
     void reply.code(404).send({
       error: { code: 'NOT_FOUND', message: `route ${request.method} ${request.url} not found`, details: {} },
@@ -80,11 +83,19 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     const status = err instanceof Error && 'statusCode' in err
       ? ((err as { statusCode?: number }).statusCode ?? 500)
       : 500;
-    const code = status >= 500 ? 500 : status;
     const body = toErrorBody(err);
     if (status >= 500) request.log.error(err);
-    void reply.code(code).send(body);
+    void reply.code(status).send(body);
   });
+
+  await app.register(health);
+  await app.register(geocode);
+  await app.register(route);
+  await app.register(matrix);
+  await app.register(isochrone);
+  await app.register(trace);
+  await app.register(poi);
+  await app.register(tiles);
 
   return app;
 }

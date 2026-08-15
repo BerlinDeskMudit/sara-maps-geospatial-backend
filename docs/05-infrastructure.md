@@ -8,7 +8,7 @@
 | `valhalla` | `ghcr.io/valhalla/valhalla-scripted:latest` | — (internal `8002`) | `valhalla_files:/custom_files` | builds routing tiles from PBF on first start |
 | `postgis` | `postgis/postgis:16-3.4` | — (internal `5432`) | `pgdata:/var/lib/postgresql/data`, `./docker/postgis/init:/docker-entrypoint-initdb.d` | extensions + `sara` schema auto-created |
 | `martin` | `ghcr.io/maplibre/martin:latest` | — (internal `3000`) | `./docker/martin/martin.yaml:/config/martin.yaml` | reads PostGIS directly |
-| `redis` | `redis:7-alpine` | — (internal `6379`) | `redisdata:/data` | cache + rate limit |
+| `redis` | `redis:7-alpine` | — (internal `6379`) | `redisdata:/data` | response cache |
 
 Internal network `sara-net`. Only `api` publishes to the host.
 
@@ -21,7 +21,7 @@ Everything is scripted and idempotent.
   `docker/data/`.
 - Skips if already present (checksum optional).
 
-### 2.2 Extract (`scripts/extract-region.ps1` / `.sh`)
+### 2.2 Extract (`scripts/extract-region.ps1`)
 - Uses `osmium` (container `osmcode/osmium-tool`) to extract Jabalpur bounding box
   `lon 79.82..80.25, lat 22.95..23.36` → `docker/data/jabalpur.osm.pbf` (tens of MB).
 - Region/bbox configurable via `.env` (`REGION_NAME`, `REGION_BBOX`, `REGION_GEOM`).
@@ -34,10 +34,10 @@ Everything is scripted and idempotent.
   `use_tiles_ignore_pbf=False`.
 
 ### 2.4 OSM → PostGIS (`scripts/import-osm2pgsql.ps1`)
-- Runs `iboates/osm2pgsql:latest` (container) against `postgis`:
-  `osm2pgsql --flex --output=flex --cache 2000 docker/data/jabalpur.osm.pbf`.
-- Then applies `docker/postgis/init/02-poi-schema.sql` (creates `sara.places`,
-  refreshes materialized view, builds indexes).
+- Runs `iboates/osm2pgsql:latest` (container) against `postgis` with the legacy pgsql output:
+  `osm2pgsql -c -l --hstore --number-processes 4 docker/data/jabalpur.osm.pbf`.
+- Then applies `docker/postgis/sara-schema.sql` (creates `sara.places`, the `sara.tile_*` MVT
+  views, and their indexes), refreshes `sara.places`, and restarts Martin.
 
 ### 2.5 Martin tiles
 - `martin` reads `sara.tile_*` views; no separate build step. Restart after import:

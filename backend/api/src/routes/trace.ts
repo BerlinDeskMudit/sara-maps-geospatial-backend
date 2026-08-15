@@ -24,7 +24,7 @@ const schema = {
       },
     },
     mode: { type: 'string', default: 'auto' },
-    radius: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
+    radius: { type: 'integer', minimum: 1, maximum: 100, default: 100 },
   },
 };
 

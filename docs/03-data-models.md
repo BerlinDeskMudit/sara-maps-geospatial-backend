@@ -74,7 +74,9 @@ Each exposes `osm_id` (feature id), `name`, `category`, and `way` geometry. Mart
 | `geo:rev:{hash(lat,lon,radius)}` | 24 h | reverse geocode JSON |
 | `route:{hash(orig,dest,mode,costings)}` | 2 min | route JSON |
 | `isochrone:{hash(...)}` | 15 min | contour JSON |
-| `rate:{ip}:{route}` | sliding 60 s | request counter |
+
+Redis is used for response caching only; API rate limiting is in-memory
+(`@fastify/rate-limit`, one window per process).
 
 ## 5. Future models (phase 2/3)
 

@@ -20,7 +20,7 @@ the research doc:
 | D4 | Spatial storage | **PostgreSQL + PostGIS** | De-facto standard, osm2pgsql support, H3 + pg_trgm extensions, relational querying. |
 | D5 | API gateway | **TypeScript + Fastify** | One language across client (RN) and gateway; OpenAPI out of the box; fast. |
 | D6 | Data source | **OpenStreetMap** via Geofabrik India extract + osmium city extraction | Free, ODbL, covers routing + POIs + basemap. GCJ-02 handling documented for China scenarios (ADR-0006). |
-| D7 | Caching | **Redis** | Route/geocode caching + rate limiting; cheap, standard. |
+| D7 | Caching | **Redis** | Route/geocode/isochrone response caching; cheap, standard. Rate limiting is in-memory. |
 
 ## 3. Component inventory
 
@@ -41,7 +41,7 @@ the research doc:
 - We add a curated `sara` schema:
   - `sara.places` — materialized view of named features (POIs + places) with `tsvector`, trigram, and H3 indexes (geocoding + POI search).
   - `sara.tile_*` — MVT-friendly views served by Martin.
-- `docker/postgis/init/01-extensions.sql`, `02-poi-schema.sql`.
+- `docker/postgis/sara-schema.sql` (creates `sara` schema, views, indexes).
 
 ### 3.3 Martin (vector tiles)
 - Image: `ghcr.io/maplibre/martin:latest`
@@ -55,11 +55,11 @@ the research doc:
   - Standard GeoJSON-ish response envelope.
   - `/health` incl. dependency status.
   - OpenAPI docs at `/docs` (`@fastify/swagger`).
-  - Redis cache for geocode + route; rate limiting.
+  - Redis cache for geocode, route, isochrone; in-memory rate limiting.
 - Forwards to Valhalla/PostGIS/Martin; never exposes engine internals to the client.
 
 ### 3.5 Redis (cache)
-- Image: `redis:7-alpine`. Route responses (short TTL), geocode (long TTL), API rate limits.
+- Image: `redis:7-alpine`. Response cache only: geocode (24 h), route (2 min), isochrone (15 min).
 
 ## 4. Data flow
 
@@ -69,7 +69,7 @@ Geofabrik india-latest.osm.pbf (~1.4 GB)
         │  scripts/fetch-region.ps1
         ▼
 docker/data/india-latest.osm.pbf
-        │  scripts/extract-region.sh (osmium bbox)  lon 79.82..80.25, lat 22.95..23.36
+        │  scripts/extract-region.ps1 (osmium bbox)  lon 79.82..80.25, lat 22.95..23.36
         ▼
 docker/data/jabalpur.osm.pbf  (~10-40 MB)
         ├─► Valhalla: /custom_files/jabalpur.osm.pbf ──► builds routing tiles
@@ -78,7 +78,7 @@ docker/data/jabalpur.osm.pbf  (~10-40 MB)
 
 ### 4.2 Request paths
 - **Route**: `GET /v1/route` → gateway → Valhalla `/route` → normalized response (+ cached in Redis).
-- **Map-match**: `POST /v1/trace/route` → gateway → Valhalla `/trace_route` (HMM) → matched polyline + per-segment confidence.
+- **Map-match**: `POST /v1/trace/route` → gateway → Valhalla `/trace_attributes` (map_snap) → matched polyline + per-segment confidence.
 - **Geocode**: `GET /v1/geocode?q=` → gateway → PostGIS `sara.places` (pg_trgm + tsvector ranking).
 - **Reverse**: `GET /v1/geocode/reverse` → PostGIS nearest feature.
 - **POI**: `GET /v1/poi/search|nearby` → PostGIS `sara.places` (H3 bbox prefilter + `ST_DWithin`).

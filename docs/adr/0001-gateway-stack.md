@@ -7,7 +7,7 @@ Sara Maps needs a gateway + data pipeline + docs, with a React Native client com
 We want one repo, shared conventions, no multi-language sprawl in phase 1.
 
 ## Decision
-- Single repo `Sara-Map` with `docs/`, `docker/`, `scripts/`, `backend/`.
+- Single repo `SaraMap` with `docs/`, `docker/`, `scripts/`, `backend/`.
 - Gateway written in **TypeScript on Fastify** (Node 22 LTS). Rationale: client is RN/TS →
   shared types/conventions; Fastify gives OpenAPI, typed JSON schema, fast startup; huge
   ecosystem for caching/rate-limit/logging.

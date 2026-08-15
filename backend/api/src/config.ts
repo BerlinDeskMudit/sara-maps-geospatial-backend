@@ -9,6 +9,7 @@ export interface Config {
   rateLimitMax: number;
   geocodeCacheTtlS: number;
   routeCacheTtlS: number;
+  isochroneCacheTtlS: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -24,5 +25,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     rateLimitMax: Number(env.API_RATE_LIMIT_MAX ?? 120),
     geocodeCacheTtlS: Number(env.GEOCODE_CACHE_TTL_S ?? 86400),
     routeCacheTtlS: Number(env.ROUTE_CACHE_TTL_S ?? 120),
+    isochroneCacheTtlS: Number(env.ISOCHRONE_CACHE_TTL_S ?? 900),
   };
 }

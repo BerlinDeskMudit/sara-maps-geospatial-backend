@@ -7,6 +7,7 @@ import type { PlaceRow } from '../clients/postgres.js';
 const qsSchema = {
   type: 'object',
   additionalProperties: false,
+  required: ['q'],
   properties: {
     q: { type: 'string', minLength: 1, maxLength: 200 },
     limit: { type: 'integer', minimum: 1, maximum: 50, default: 5 },

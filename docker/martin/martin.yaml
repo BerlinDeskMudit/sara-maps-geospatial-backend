@@ -8,6 +8,9 @@ postgres:
     tables:
       from_schemas:
         - sara
+      # Publish as bare table names (tile_points, tile_roads, tile_areas) so the
+      # gateway allowlist and frontend tile URLs can stay schema-free.
+      source_id_format: "{table}"
       id_columns:
         - osm_id
       clip_geom: true

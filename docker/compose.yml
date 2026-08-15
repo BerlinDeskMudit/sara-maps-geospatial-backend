@@ -148,6 +148,7 @@ services:
       API_RATE_LIMIT_MAX: ${API_RATE_LIMIT_MAX:-120}
       GEOCODE_CACHE_TTL_S: ${GEOCODE_CACHE_TTL_S:-86400}
       ROUTE_CACHE_TTL_S: ${ROUTE_CACHE_TTL_S:-120}
+      ISOCHRONE_CACHE_TTL_S: ${ISOCHRONE_CACHE_TTL_S:-900}
     ports:
       - "${API_PORT:-8080}:8080"
     networks: [sara-net]

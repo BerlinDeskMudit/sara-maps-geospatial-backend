@@ -144,5 +144,5 @@ Proxy to Martin. Returns `application/x-protobuf` MVT. Layers: `sara.tile_points
 
 ## Rate limiting & caching
 
-- Gateway rate limit: 120 req/min per IP (Redis sliding window), headers `X-RateLimit-*`.
-- Geocode/route responses cached per the table in `docs/03-data-models.md §4`.
+- Gateway rate limit: 120 req/min per IP (in-memory store via `@fastify/rate-limit`), headers `X-RateLimit-*`.
+- Geocode/route/isochrone responses cached per the table in `docs/03-data-models.md §4`.
