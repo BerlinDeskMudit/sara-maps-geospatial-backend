@@ -1,4 +1,4 @@
-import type { LatLng } from './types';
+import type { LatLng, PoiResult } from './types';
 
 export function decodePolyline(str: string, precision: number): LatLng[] {
   const factor = Math.pow(10, precision);
@@ -109,3 +109,16 @@ export const asLatLng = (s: string): LatLng | null => {
 
 export const fmtLatLon = (p: LatLng) =>
   `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+
+export function nearestPoi(ll: LatLng, pois: PoiResult[], maxM = 2500): PoiResult | null {
+  let best: PoiResult | null = null;
+  let bestD = maxM;
+  for (const p of pois) {
+    const d = haversineM(ll, p.center);
+    if (d < bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}

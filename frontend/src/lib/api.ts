@@ -118,10 +118,10 @@ export const api = {
       `/v1/poi/search${qs({ q, center, radius, limit })}`,
     ),
 
-  poiNearby: (lat: number, lon: number, radius = 1500, category?: string, limit = 20) =>
+  poiNearby: (lat: number, lon: number, radius = 1500, category?: string, limit = 20, subcategory?: string) =>
     call<{ results: PoiResult[] }>(
       'GET',
-      `/v1/poi/nearby${qs({ lat, lon, radius, category, limit })}`,
+      `/v1/poi/nearby${qs({ lat, lon, radius, category, limit, subcategory })}`,
     ),
 
   matrix: (locations: string, mode: RouteMode) =>

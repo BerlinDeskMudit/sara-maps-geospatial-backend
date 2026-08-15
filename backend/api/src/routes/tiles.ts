@@ -30,7 +30,8 @@ export const tiles: FastifyPluginAsync = async (fastify) => {
     },
     reply: {
       header(name: string, value: string): unknown;
-      send(body: unknown): unknown;
+      code(statusCode: number): { send(body?: unknown): unknown };
+      send(body?: unknown): unknown;
     },
     defaultSource: string,
   ) => {
@@ -49,6 +50,14 @@ export const tiles: FastifyPluginAsync = async (fastify) => {
     }
     if (res.status === 404) {
       throw new AppError('TILE_NOT_FOUND', 'tile not found', 404);
+    }
+    if (res.status === 204) {
+      reply.header(
+        'content-type',
+        res.headers.get('content-type') ?? 'application/x-protobuf',
+      );
+      reply.header('cache-control', 'public, max-age=86400');
+      return reply.code(204).send();
     }
     if (!res.ok) {
       throw new AppError('TILE_ERROR', `tile server returned ${res.status}`, 502);

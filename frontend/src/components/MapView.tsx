@@ -34,8 +34,10 @@ interface Props {
   overlays: Overlays;
   pins: Pins;
   flyTo?: FlyTo | null;
+  blueDot?: LatLng | null;
   onPick: (ll: LatLng) => void;
   onCursor: (c: { lat: number; lon: number; zoom: number } | null) => void;
+  onMapReady?: (map: maplibregl.Map) => void;
 }
 
 const PIN_LABELS: Record<PinRole, string> = {
@@ -61,6 +63,7 @@ function ensureOverlayLayers(map: maplibregl.Map) {
     ['trace', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }],
     ['matrix-lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }],
     ['matrix-pts', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }],
+    ['blue-dot', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }],
   ];
   for (const [id, spec] of sources) {
     if (!map.getSource(id)) map.addSource(id, spec as never);
@@ -72,22 +75,22 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       source: 'route-line',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: {
-        'line-color': '#1a73e8',
+        'line-color': '#00d9c8',
         'line-width': 5,
-        'line-opacity': 0.92,
+        'line-opacity': 0.95,
       },
     },
     {
       id: 'iso-fill',
       type: 'fill',
       source: 'iso',
-      paint: { 'fill-color': '#9334e6', 'fill-opacity': 0.12 },
+      paint: { 'fill-color': '#a78bfa', 'fill-opacity': 0.14 },
     },
     {
       id: 'iso-line',
       type: 'line',
       source: 'iso',
-      paint: { 'line-color': '#9334e6', 'line-width': 2, 'line-dasharray': [3, 2] },
+      paint: { 'line-color': '#a78bfa', 'line-width': 2, 'line-dasharray': [3, 2] },
     },
     {
       id: 'poi-circles',
@@ -95,8 +98,8 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       source: 'poi',
       paint: {
         'circle-radius': 5,
-        'circle-color': '#f9ab00',
-        'circle-stroke-color': '#ffffff',
+        'circle-color': '#fbbf24',
+        'circle-stroke-color': '#0a0e14',
         'circle-stroke-width': 1.5,
       },
     },
@@ -106,9 +109,9 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       source: 'trace',
       filter: ['==', ['get', 'kind'], 'raw'],
       paint: {
-        'line-color': '#ffffff',
+        'line-color': '#94a3b8',
         'line-width': 1.5,
-        'line-opacity': 0.35,
+        'line-opacity': 0.45,
         'line-dasharray': [1, 2],
       },
     },
@@ -119,7 +122,7 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       filter: ['==', ['get', 'kind'], 'matched'],
       layout: { 'line-cap': 'round' },
       paint: {
-        'line-color': '#188038',
+        'line-color': '#4ade80',
         'line-width': 4.5,
         'line-opacity': 0.95,
       },
@@ -131,8 +134,8 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       filter: ['==', ['get', 'kind'], 'pt'],
       paint: {
         'circle-radius': 3,
-        'circle-color': '#188038',
-        'circle-stroke-color': '#fff',
+        'circle-color': '#4ade80',
+        'circle-stroke-color': '#0a0e14',
         'circle-stroke-width': 1,
       },
     },
@@ -141,7 +144,7 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       type: 'line',
       source: 'matrix-lines',
       paint: {
-        'line-color': '#009688',
+        'line-color': '#fb7185',
         'line-width': ['interpolate', ['linear'], ['get', 'd'], 0, 1, 1, 3],
         'line-opacity': ['interpolate', ['linear'], ['get', 'd'], 0, 0.18, 1, 0.7],
         'line-dasharray': [4, 3],
@@ -153,9 +156,32 @@ function ensureOverlayLayers(map: maplibregl.Map) {
       source: 'matrix-pts',
       paint: {
         'circle-radius': 6,
-        'circle-color': '#009688',
-        'circle-stroke-color': '#fff',
+        'circle-color': '#fb7185',
+        'circle-stroke-color': '#0a0e14',
         'circle-stroke-width': 1.5,
+      },
+    },
+    {
+      id: 'blue-dot-halo',
+      type: 'circle',
+      source: 'blue-dot',
+      paint: {
+        'circle-radius': 14,
+        'circle-color': '#00d9c8',
+        'circle-opacity': 0.2,
+        'circle-stroke-color': '#00d9c8',
+        'circle-stroke-width': 2,
+      },
+    },
+    {
+      id: 'blue-dot-core',
+      type: 'circle',
+      source: 'blue-dot',
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#00d9c8',
+        'circle-stroke-color': '#0a0e14',
+        'circle-stroke-width': 2,
       },
     },
   ];
@@ -164,10 +190,13 @@ function ensureOverlayLayers(map: maplibregl.Map) {
   }
 }
 
-export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Props) {
+export default function MapView({ overlays, pins, flyTo, blueDot, onPick, onCursor, onMapReady }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRefs = useRef<Record<string, maplibregl.Marker[]>>({});
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
+  const prevRouteRef = useRef<Overlays['route']>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -185,7 +214,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
           basemap: {
             type: 'raster',
             tileSize: 256,
-            tiles: ['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],
+            tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],
             attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
           },
           roads: { type: 'vector', tiles: ['/api/v1/tiles/tile_roads/{z}/{x}/{y}.mvt'], maxzoom: 16 },
@@ -199,7 +228,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
             type: 'fill',
             source: 'areas',
             'source-layer': 'tile_areas',
-            paint: { 'fill-color': '#c8e6c9', 'fill-opacity': 0.4 },
+            paint: { 'fill-color': '#1e293b', 'fill-opacity': 0.45 },
           },
           {
             id: 'roads-casing',
@@ -207,7 +236,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
             source: 'roads',
             'source-layer': 'tile_roads',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: { 'line-color': '#ffffff', 'line-width': 7 },
+            paint: { 'line-color': '#0a0e14', 'line-width': 7 },
           },
           {
             id: 'roads',
@@ -219,12 +248,12 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
               'line-color': [
                 'match',
                 ['get', 'class'],
-                'motorway', '#e53935',
-                'trunk', '#e53935',
-                'primary', '#fb8c00',
-                'secondary', '#fdd835',
-                'tertiary', '#c0ca33',
-                '#90a4ae',
+                'motorway', '#f87171',
+                'trunk', '#f87171',
+                'primary', '#fb923c',
+                'secondary', '#fbbf24',
+                'tertiary', '#94a3b8',
+                '#64748b',
               ],
               'line-width': [
                 'match',
@@ -245,8 +274,8 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
             'source-layer': 'tile_points',
             paint: {
               'circle-radius': 3.5,
-              'circle-color': '#1976d2',
-              'circle-stroke-color': '#fff',
+              'circle-color': '#00d9c8',
+              'circle-stroke-color': '#0a0e14',
               'circle-stroke-width': 1,
             },
           },
@@ -262,7 +291,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
               'text-anchor': 'top',
               'text-allow-overlap': false,
             },
-            paint: { 'text-color': '#263238', 'text-halo-color': '#fff', 'text-halo-width': 1 },
+            paint: { 'text-color': '#e2e8f0', 'text-halo-color': '#0a0e14', 'text-halo-width': 1.4 },
           },
         ],
       },
@@ -286,6 +315,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
     map.on('load', () => {
       ensureOverlayLayers(map);
       setReady(true);
+      onMapReadyRef.current?.(map);
     });
     map.addControl(
       new maplibregl.NavigationControl({
@@ -358,13 +388,15 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
         ]
       : [];
     setLayerData(map, 'route-line', { type: 'FeatureCollection', features });
-    if (r) {
+    const was = prevRouteRef.current;
+    prevRouteRef.current = r;
+    if (r && !was) {
       const coords = decodePolyline(r.geometry, 5).map(ll);
       const bounds = coords.reduce(
         (b, c) => b.extend(c),
         new maplibregl.LngLatBounds(coords[0], coords[0]),
       );
-      map.fitBounds(bounds, { padding: { top: 60, right: 440, bottom: 60, left: 40 } });
+      map.fitBounds(bounds, { padding: { top: 90, right: 120, bottom: 120, left: 120 } });
     }
   }, [overlays.route, ready]);
 
@@ -393,7 +425,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
           (b, c) => b.extend(c),
           new maplibregl.LngLatBounds(coords[0], coords[0]),
         );
-        map.fitBounds(bounds, { padding: { top: 60, right: 440, bottom: 60, left: 40 } });
+        map.fitBounds(bounds, { padding: { top: 90, right: 120, bottom: 120, left: 120 } });
       }
     }
   }, [overlays.isochrones, ready]);
@@ -411,6 +443,17 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
     }));
     setLayerData(map, 'poi', { type: 'FeatureCollection', features });
   }, [overlays.pois, ready]);
+
+  // blue dot
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    ensureOverlayLayers(map);
+    const features = blueDot
+      ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'Point' as const, coordinates: ll(blueDot) } }]
+      : [];
+    setLayerData(map, 'blue-dot', { type: 'FeatureCollection', features });
+  }, [blueDot, ready]);
 
   // trace overlay
   useEffect(() => {
@@ -469,7 +512,7 @@ export default function MapView({ overlays, pins, flyTo, onPick, onCursor }: Pro
       (b, p) => b.extend(ll(p)),
       new maplibregl.LngLatBounds(ll(m.locations[0]), ll(m.locations[0])),
     );
-    map.fitBounds(bounds, { padding: { top: 60, right: 440, bottom: 60, left: 40 } });
+    map.fitBounds(bounds, { padding: { top: 90, right: 120, bottom: 120, left: 120 } });
   }, [overlays.matrix, ready]);
 
   return (

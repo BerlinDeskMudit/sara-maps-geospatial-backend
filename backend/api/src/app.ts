@@ -71,6 +71,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(rateLimit, {
     max: config.rateLimitMax,
     timeWindow: '1 minute',
+    allowList: (request) => request.url.startsWith('/v1/tiles'),
   });
 
   app.setNotFoundHandler((request, reply) => {

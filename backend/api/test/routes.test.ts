@@ -500,6 +500,21 @@ describe('tiles', () => {
       await app.close();
     }
   });
+
+  it('passes through empty (204) tiles without a body', async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(null, { status: 204 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const app = await makeApp();
+    try {
+      const res = await app.inject({ method: 'GET', url: '/v1/tiles/tile_roads/0/0/0.mvt' });
+      expect(res.statusCode).toBe(204);
+      expect(res.headers['cache-control']).toBe('public, max-age=86400');
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe('404 handler', () => {
